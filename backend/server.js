@@ -4,13 +4,20 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 
 const app = express();
-app.use(cors());
+
+// Allow both local and dummy.com for Express HTTP routes
+app.use(cors({
+  origin: ['http://localhost:3000', 'https://dummy-domain.com'],
+  methods: ['GET', 'POST']
+}));
+
 const server = http.createServer(app);
 
+// Allow both origins for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: ['http://localhost:3000', 'https://dummy-domain.com'],
+    methods: ['GET', 'POST']
   }
 });
 
@@ -25,11 +32,12 @@ io.on('connection', (socket) => {
     if (!rooms.has(roomID)) {
       rooms.set(roomID, new Map());
     }
+
     const room = rooms.get(roomID);
     room.set(socket.id, { name: userName });
 
     socket.to(roomID).emit('user-joined', { id: socket.id, name: userName });
-    
+
     const users = Array.from(room.entries())
       .filter(([id]) => id !== socket.id)
       .map(([id, user]) => ({ id, name: user.name }));
@@ -66,3 +74,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
