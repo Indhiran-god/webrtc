@@ -1,58 +1,74 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-require('dotenv').config(); // Optional, if using .env file
+const cors = require('cors');
 
 const app = express();
+app.use(cors());
+
 const server = http.createServer(app);
 
-// Define allowed origin based on environment
 const isProduction = process.env.NODE_ENV === 'production';
-const allowedOrigin = isProduction 
-  ? process.env.PROD_CLIENT_URL || 'https://webrtc3-sand.vercel.app' 
+const allowedOrigin = isProduction
+  ? process.env.PROD_CLIENT_URL || 'https://webrtc3-sand.vercel.app'
   : '*';
 
-// Initialize Socket.IO server with appropriate CORS
 const io = new Server(server, {
   cors: {
     origin: allowedOrigin,
-    methods: ["GET", "POST"],
-    credentials: !isProduction ? false : true,
+    methods: ["GET", "POST"]
   }
 });
 
-// Track which room each socket is in
-const userRoomMap = {};
+const rooms = new Map();
 
 io.on('connection', (socket) => {
-  console.log(`New user connected: ${socket.id}`);
+  console.log(`User connected: ${socket.id}`);
 
-  socket.on('join-room', (roomID) => {
+  socket.on('join-room', (roomID, userName) => {
     socket.join(roomID);
-    userRoomMap[socket.id] = roomID;
+    
+    if (!rooms.has(roomID)) {
+      rooms.set(roomID, new Map());
+    }
+    const room = rooms.get(roomID);
+    room.set(socket.id, { name: userName });
 
-    socket.to(roomID).emit('user-joined', socket.id);
+    socket.to(roomID).emit('user-joined', { id: socket.id, name: userName });
+    
+    const users = Array.from(room.entries())
+      .filter(([id]) => id !== socket.id)
+      .map(([id, user]) => ({ id, name: user.name }));
+    socket.emit('existing-users', users);
 
     socket.on('signal', (data) => {
-      io.to(data.target).emit('signal', {
+      socket.to(data.target).emit('signal', {
         from: socket.id,
-        signal: data.signal
+        signal: data.signal,
+        userName
       });
     });
 
+    socket.on('message', (messageText) => {
+      const messageData = {
+        sender: userName,
+        message: messageText,
+        timestamp: new Date().toISOString()
+      };
+      io.to(roomID).emit('message', messageData);
+    });
+
+    socket.on('draw', (drawData) => {
+      socket.to(roomID).emit('draw', drawData);
+    });
+
     socket.on('disconnect', () => {
-      const roomID = userRoomMap[socket.id];
-      if (roomID) {
-        socket.to(roomID).emit('user-disconnected', socket.id);
-        delete userRoomMap[socket.id];
-      }
-      console.log(`User disconnected: ${socket.id}`);
+      room.delete(socket.id);
+      socket.to(roomID).emit('user-left', socket.id);
+      if (room.size === 0) rooms.delete(roomID);
     });
   });
 });
 
-// Use env or fallback to port 5000
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Signaling server running at http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
