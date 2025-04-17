@@ -5,17 +5,11 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
-
 const server = http.createServer(app);
-
-const isProduction = process.env.NODE_ENV === 'production';
-const allowedOrigin = isProduction
-  ? process.env.PROD_CLIENT_URL || 'https://webrtc3-sand.vercel.app'
-  : '*';
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigin,
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
