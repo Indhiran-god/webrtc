@@ -7,7 +7,7 @@ const app = express();
 
 // Allow both local and dummy.com for Express HTTP routes
 app.use(cors({
-  origin: ['http://localhost:3000', 'https://dummy-domain.com'],
+  origin: ['http://localhost:3000', 'https://dummy-domain.com','https://webrtc6.vercel.app'],
   methods: ['GET', 'POST']
 }));
 
@@ -16,7 +16,7 @@ const server = http.createServer(app);
 // Allow both origins for Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'https://dummy-domain.com'],
+    origin: ['http://localhost:3000', 'https://dummy-domain.com','https://webrtc6.vercel.app'],
     methods: ['GET', 'POST']
   }
 });
